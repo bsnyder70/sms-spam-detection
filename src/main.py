@@ -3,16 +3,32 @@ from torch import nn
 from TransformerClassifier import TransformerClassifier
 from train import generate_train_test, train, evaluate
 from sklearn.metrics import confusion_matrix, classification_report
+import data_process
 
 def main():
 
-    model = TransformerClassifier()
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+    # move these to a config 
+    batch_size = 32
+    num_epochs = 10
+    embed_dim = 128
+    num_heads = 4
+    ff_dim = 128
+    dropout = 0.3
+    max_length = 180
+    num_encoder_layers = 2
+    class_hidden_dim = 64
+    learning_rate = 1e-4
+
+    # Download the data and generate train/test splits.
+    dataset, vocab_size = data_process.build_data()
+    train_loader, valid_loader, test_loader = generate_train_test(dataset=dataset, batch_size=batch_size)
+    
+    # Initialize the model, optimizer, and crtierion.
+    model = TransformerClassifier(vocab_size, embed_dim, num_heads, ff_dim, dropout, max_length, num_encoder_layers, class_hidden_dim)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     criterion = nn.BCELoss() 
 
-    train_loader, valid_loader, test_loader = generate_train_test()
-
-    train(model, train_loader, valid_loader, optimizer, criterion)
+    train(model=model, train_loader=train_loader, valid_loader=valid_loader, optimizer=optimizer, criterion=criterion, num_epochs=num_epochs)
 
     test_loss, test_acc, preds, labels = evaluate(model, test_loader, nn.BCELoss())
 

@@ -80,6 +80,9 @@ def build_data():
     3) Using the tokens, build the vocabulary.
     4) Convert the examples and labels into Tensors and load into a custom Torch DataSet.
 
+    Parameters:
+        None
+
     Returns: 
        SpamDataset: Custom Torch Dataset used to store all the examples
        vocab_size: The number of unique tokens stored in the vocabulary
@@ -118,7 +121,7 @@ def build_data():
 
     return spam_dataset, vocab_size
 
-def preprocess_text(text, max_seq_len):
+def preprocess_text(text):
     """
     Preprocess and tokenize the example text. 
 

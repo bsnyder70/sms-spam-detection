@@ -3,7 +3,7 @@ from torch import nn
 
 class TransformerClassifier(nn.Module):
 
-    def __init__(self):
+    def __init__(self, vocab_size, embed_dim, num_heads, ff_dim, dropout, max_length, num_encoder_layers, class_hidden_dim):
         """
         Initializes our Transformer Classifier.
 
@@ -19,14 +19,14 @@ class TransformerClassifier(nn.Module):
         self.ff_dim = 128
         self.dropout = 0.3
         self.max_length = 180
-        self.num_layers = 2
+        self.num_encoder_layers = 2
         self.class_hidden_dim = 64
 
         self.embedding_str = nn.Embedding(self.vocab_size, self.embed_dim)
         self.embedding_pos = nn.Embedding(self.max_length, self.embed_dim)
 
         self.encoder_layer = nn.TransformerEncoderLayer(d_model=self.embed_dim, nhead=self.num_heads, dim_feedforward=self.ff_dim, dropout=self.dropout, batch_first=True)
-        self.encoder = nn.TransformerEncoder(self.encoder_layer, num_layers=self.num_layers)
+        self.encoder = nn.TransformerEncoder(self.encoder_layer, num_layers=self.num_encoder_layers)
 
         self.cls_token = nn.Parameter(torch.randn(1, 1, self.embed_dim))
 

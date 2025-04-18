@@ -5,25 +5,26 @@ from torch.utils.data import random_split, DataLoader
 import data_process
 from TransformerClassifier import TransformerClassifier
 
-def generate_train_test(batch_size):
+def generate_train_test(dataset, batch_size):
     """
     Generates train / validation / test DataLoader sets from our data set.
 
-    We use a train/val/test split of 0.7/0.15/0.15. 
+    We use a train / val / test split of 0.7 / 0.15 / 0.15. 
+
+    Parameters:
+        dataset: Dataset to use
+        batch_size: Batch size for each DataLoader
 
     Returns:
         Train / validation / test DataLoaders
     """
 
-    # Note size of dataset is 5572
-    spam_dataset = data_process.build_data()
-
     # Separate into train/val/test sets
-    train_size = int(0.7 * len(spam_dataset))
-    val_size = int(0.15 * len(spam_dataset))
-    test_size = len(spam_dataset) - (train_size + val_size)
+    train_size = int(0.7 * len(dataset))
+    val_size = int(0.15 * len(dataset))
+    test_size = len(dataset) - (train_size + val_size)
 
-    train_dataset, val_dataset, test_dataset = random_split(spam_dataset, [train_size, val_size, test_size])
+    train_dataset, val_dataset, test_dataset = random_split(dataset, [train_size, val_size, test_size])
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size,
                         shuffle=False)
