@@ -5,10 +5,10 @@ class TransformerClassifier(nn.Module):
 
     def __init__(self):
         """
-        
-        :param X: xxx
+        Initializes our Transformer Classifier.
 
-        :returns: XXX
+        The basic structure is:
+        Input -> Embedding + Positional Embedding -> Transformer Encoder -> FNN Classifier
         """
 
         super(TransformerClassifier, self).__init__()
@@ -39,10 +39,13 @@ class TransformerClassifier(nn.Module):
 
     def forward(self, X):
         """
-        
-        :param X: xxx
+        Forward pass of the model
 
-        :returns: XXX
+        Parameters:
+            X: Input data of shape (batch_size x seq_len)
+
+        Returns:
+            classifier_output: Model output of shape (batch_size x 1)
         """
 
         N, T = X.shape
