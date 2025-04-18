@@ -60,7 +60,7 @@ def train(model, train_loader, valid_loader, optimizer, criterion):
             total += labels.size(0)
         
         train_acc = correct / total
-        val_loss, val_acc = evaluate(model, valid_loader, criterion)
+        val_loss, val_acc, _, _ = evaluate(model, valid_loader, criterion)
 
         print(f"Epoch {epoch_idx+1}/{NUM_EPOCHS} | Train Loss: {total_loss:.4f} | Train Acc: {train_acc:.4f} | Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.4f}")
 
@@ -74,6 +74,9 @@ def evaluate(model, data_loader, criterion):
     correct = 0
     total = 0
 
+    tot_preds = []
+    tot_labels = []
+
     for batch_idx, (examples, labels) in enumerate(data_loader):
 
         outputs = model(examples)
@@ -81,12 +84,16 @@ def evaluate(model, data_loader, criterion):
 
         total_loss += loss.item()
         preds = (outputs > 0.5).float()
+        
         correct += (preds == labels).sum().item()
         total += labels.size(0)
+
+        tot_preds.extend(preds)
+        tot_labels.extend(labels)
 
     avg_loss = total_loss / len(data_loader)
     acc = correct / total
 
-    return avg_loss, acc
+    return avg_loss, acc, tot_preds, tot_labels
     
 #generate_train_test()
