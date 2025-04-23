@@ -12,7 +12,7 @@ from model.config import default_config
 
 import torch
 from torch import nn
-from TransformerClassifier import TransformerClassifier
+from model.TransformerClassifier import TransformerClassifier
 from train import generate_train_test, evaluate
 from sklearn.metrics import confusion_matrix, classification_report
 from data_process import get_input_from_text, Vocabulary, build_data

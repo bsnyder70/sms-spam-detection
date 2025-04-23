@@ -1,5 +1,5 @@
 from src.data_process import build_data
-from src.TransformerClassifier import TransformerClassifier
+from model.TransformerClassifier import TransformerClassifier
 from src.train import generate_train_test
 from sklearn.metrics import confusion_matrix, classification_report
 import torch
