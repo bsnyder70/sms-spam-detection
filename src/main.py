@@ -124,7 +124,7 @@ def main():
     # for alpha in alphas:
     #     for gamma in gammas:
     #         label = f"focal_a{alpha}_g{gamma}"
-    #         print(f"\n🎯 Tuning for alpha={alpha}, gamma={gamma}")
+    #         print(f"\n Tuning for alpha={alpha}, gamma={gamma}")
     #         loss_fn = FocalLoss(alpha=alpha, gamma=gamma)
 
     #         best = tuning(

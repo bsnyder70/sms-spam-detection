@@ -14,7 +14,6 @@ class TransformerClassifier(nn.Module):
         max_length,
         num_encoder_layers,
         class_hidden_dim,
-        **kwargs,
     ):
         """
         Initializes our Transformer Classifier.
