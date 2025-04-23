@@ -2,14 +2,13 @@ import torch
 from torch import nn
 import numpy as np
 from torch.utils.data import random_split, DataLoader
-import data_process
-from TransformerClassifier import TransformerClassifier
+
 
 def generate_train_test(dataset, batch_size):
     """
     Generates train / validation / test DataLoader sets from our data set.
 
-    We use a train / val / test split of 0.7 / 0.15 / 0.15. 
+    We use a train / val / test split of 0.7 / 0.15 / 0.15.
 
     Parameters:
         dataset: Dataset to use
@@ -24,16 +23,16 @@ def generate_train_test(dataset, batch_size):
     val_size = int(0.15 * len(dataset))
     test_size = len(dataset) - (train_size + val_size)
 
-    train_dataset, val_dataset, test_dataset = random_split(dataset, [train_size, val_size, test_size])
+    train_dataset, val_dataset, test_dataset = random_split(
+        dataset, [train_size, val_size, test_size]
+    )
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size,
-                        shuffle=False)
-    valid_loader = DataLoader(val_dataset, batch_size=batch_size,
-                        shuffle=False)
-    test_loader =  DataLoader(test_dataset, batch_size=batch_size,
-                       shuffle=False)
-    
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
+    valid_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+
     return train_loader, valid_loader, test_loader
+
 
 def train(model, train_loader, valid_loader, optimizer, criterion, num_epochs):
     """
@@ -51,13 +50,13 @@ def train(model, train_loader, valid_loader, optimizer, criterion, num_epochs):
     Returns:
         train_acc: Final training accuracy
         total_loss: Final training loss
-        val_acc: Final validation accuracy 
+        val_acc: Final validation accuracy
         val_loss: Final validation loss
 
     """
 
     for epoch_idx in range(num_epochs):
-        
+
         total_loss = 0
         correct = 0
         total = 0
@@ -77,13 +76,16 @@ def train(model, train_loader, valid_loader, optimizer, criterion, num_epochs):
             preds = (outputs > 0.5).float()
             correct += (preds == labels).sum().item()
             total += labels.size(0)
-        
+
         train_acc = correct / total
         val_loss, val_acc, _, _ = evaluate(model, valid_loader, criterion)
 
-        print(f"Epoch {epoch_idx+1}/{num_epochs} | Train Loss: {total_loss:.4f} | Train Acc: {train_acc:.4f} | Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.4f}")
-    
+        print(
+            f"Epoch {epoch_idx+1}/{num_epochs} | Train Loss: {total_loss:.4f} | Train Acc: {train_acc:.4f} | Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.4f}"
+        )
+
     return train_acc, total_loss, val_acc, val_loss
+
 
 def evaluate(model, data_loader, criterion):
     """
@@ -116,7 +118,7 @@ def evaluate(model, data_loader, criterion):
 
         total_loss += loss.item()
         preds = (outputs > 0.5).float()
-        
+
         correct += (preds == labels).sum().item()
         total += labels.size(0)
 
@@ -127,5 +129,6 @@ def evaluate(model, data_loader, criterion):
     acc = correct / total
 
     return avg_loss, acc, tot_preds, tot_labels
-    
-#generate_train_test()
+
+
+# generate_train_test()

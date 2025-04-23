@@ -1,4 +1,5 @@
 import os
+from src.types.interfaces import SupportsFromConfig
 import torch
 from train import generate_train_test
 from utils.plots import plot_multiple_losses
@@ -15,7 +16,7 @@ sweep_param = {
 def tuning(
     config: dict[str, any],
     dataset,
-    model_cls,
+    model_cls: SupportsFromConfig,
     loss_fn,
     optimizer_cls: type = torch.optim.AdamW,
     optimizer_kwargs: dict = None,
@@ -52,7 +53,7 @@ def tuning(
             current_config = config.copy()
             current_config[param_name] = val
 
-            model = model_cls(**current_config).to(device)
+            model = model_cls.from_config(**current_config).to(device)
             optimizer = optimizer_cls(
                 model.parameters(),
                 lr=current_config["learning_rate"],

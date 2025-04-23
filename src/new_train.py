@@ -2,7 +2,6 @@ import os
 import torch
 from typing import Optional, Callable, Any
 from torch.utils.data import DataLoader
-from TransformerClassifier import TransformerClassifier
 from training.trainer import train_epoch
 
 

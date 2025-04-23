@@ -1,27 +1,46 @@
-from src import data_process
-from src.train import TransformerClassifier
+from src.data_process import build_data
+from src.TransformerClassifier import TransformerClassifier
+from src.train import generate_train_test
+from sklearn.metrics import confusion_matrix, classification_report
 import torch
 
+# Default config for initializing model
+default_config = {
+    # Training parameters
+    "batch_size": 32,
+    "num_epochs": 10,
+    "learning_rate": 1e-4,
+    # Model architecture parameters
+    "vocab_size": 3963,
+    "embed_dim": 128,
+    "num_heads": 4,
+    "ff_dim": 128,
+    "dropout": 0.0,
+    "max_length": 180,
+    "num_encoder_layers": 2,
+    "class_hidden_dim": 64,
+}
 
-# run the code
-
+# Models to evaluate
 models = [
     {
         "name": "BCE_Classifier",
-        "path:": "outputs/bce_model.pth",
+        "path": "outputs/bce_model.pth",
         "model": TransformerClassifier,
-    }
+        "config": default_config,
+    },
 ]
 
 
 def evaluate_from_path(
-    model_cls,  # e.x TransformerClassifier
-    model_config: dict,  # config to initialize the model
+    model_cls,
+    model_config: dict,
     checkpoint_path: str,
     dataloader,
     device,
-):
-    model = model_cls(**model_config).to(device)
+) -> None:
+    # Build model from config using class method
+    model = model_cls.from_config(**model_config).to(device)
     model.load_state_dict(torch.load(checkpoint_path, map_location=device))
     model.eval()
 
@@ -36,13 +55,27 @@ def evaluate_from_path(
             all_preds.extend(preds)
             all_labels.extend(y.tolist())
 
+    print("Confusion Matrix:\n", confusion_matrix(all_labels, all_preds))
+    print(
+        "\nClassification Report:\n",
+        classification_report(all_labels, all_preds, target_names=["Ham", "Spam"]),
+    )
+
 
 if __name__ == "__main__":
+    dataset, _ = build_data()
+    _, _, test_loader = generate_train_test(
+        dataset=dataset, batch_size=default_config["batch_size"]
+    )
 
-    # Download the data and generate train/test splits.
-    dataset, vocab_size = data_process.build_data()
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    for model in models:
-        model_name = model["name"]
-        model_path = model["path:"]
-        model_cls = model["model"]
+    for model_info in models:
+        print(f"\n Evaluating {model_info['name']}")
+        evaluate_from_path(
+            model_cls=model_info["model"],
+            model_config=model_info["config"],
+            checkpoint_path=model_info["path"],
+            dataloader=test_loader,
+            device=device,
+        )

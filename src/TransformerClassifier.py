@@ -1,113 +1,105 @@
+from typing import Optional
 import torch
 from torch import nn
+from torch import Tensor
+from torch.nn import functional as F
+from typing import Tuple, Union
 
 
 class TransformerClassifier(nn.Module):
-
     def __init__(
         self,
-        vocab_size,
-        embed_dim,
-        num_heads,
-        ff_dim,
-        dropout,
-        max_length,
-        num_encoder_layers,
-        class_hidden_dim,
-    ):
-        """
-        Initializes our Transformer Classifier.
+        vocab_size: int,
+        embed_dim: int,
+        num_heads: int,
+        ff_dim: int,
+        dropout: float,
+        max_length: int,
+        num_encoder_layers: int,
+        class_hidden_dim: int,
+    ) -> None:
+        super().__init__()
 
-        The basic structure is:
-        Input -> Embedding + Positional Embedding -> Transformer Encoder -> FNN Classifier
-        """
-
-        super(TransformerClassifier, self).__init__()
-
-        self.vocab_size = vocab_size
-        self.embed_dim = embed_dim
-        self.num_heads = num_heads
-        self.ff_dim = ff_dim
-        self.dropout = dropout
-        self.max_length = max_length
-        self.num_encoder_layers = num_encoder_layers
-        self.class_hidden_dim = class_hidden_dim
-
-        self.embedding_str = nn.Embedding(self.vocab_size, self.embed_dim)
-        self.embedding_pos = nn.Embedding(self.max_length, self.embed_dim)
-
-        # self.encoder_layer = nn.TransformerEncoderLayer(d_model=self.embed_dim, nhead=self.num_heads, dim_feedforward=self.ff_dim, dropout=self.dropout, batch_first=True)
+        self.embedding_str = nn.Embedding(vocab_size, embed_dim)
+        self.embedding_pos = nn.Embedding(max_length, embed_dim)
 
         self.encoder_layers = nn.ModuleList(
-            nn.TransformerEncoderLayer(
-                d_model=self.embed_dim,
-                nhead=self.num_heads,
-                dim_feedforward=self.ff_dim,
-                dropout=self.dropout,
-                batch_first=True,
-            )
-            for _ in range(self.num_encoder_layers)
+            [
+                nn.TransformerEncoderLayer(
+                    d_model=embed_dim,
+                    nhead=num_heads,
+                    dim_feedforward=ff_dim,
+                    dropout=dropout,
+                    batch_first=True,
+                )
+                for _ in range(num_encoder_layers)
+            ]
         )
 
-        # for _ in range(self.num_encoder_layers):
-        #    self.encoder_layers.append(nn.TransformerEncoderLayer(d_model=self.embed_dim, nhead=self.num_heads, dim_feedforward=self.ff_dim, dropout=self.dropout, batch_first=True))
-
-        # self.encoder = nn.TransformerEncoder(self.encoder_layer, num_layers=self.num_encoder_layers)
-
-        self.cls_token = nn.Parameter(torch.randn(1, 1, self.embed_dim))
+        self.cls_token = nn.Parameter(torch.randn(1, 1, embed_dim))
 
         self.classifier = nn.Sequential(
-            nn.Linear(self.embed_dim, self.class_hidden_dim),
+            nn.Linear(embed_dim, class_hidden_dim),
             nn.ReLU(),
-            nn.Linear(self.class_hidden_dim, 1),
+            nn.Linear(class_hidden_dim, 1),
         )
 
-    def forward(self, X, get_attn_weights=False):
+    def forward(
+        self,
+        X: Tensor,
+        get_attn_weights: bool = False,
+    ) -> Union[Tensor, Tuple[Tensor, Tensor]]:
         """
-        Forward pass of the model
-
         Parameters:
-            X: Input data of shape (batch_size x seq_len)
-            get_attn_weights: Determines if we extract attention weights from the first layer
+            X: (batch_size x seq_len) input token indices
+            get_attn_weights: If True, returns attention weights from the first encoder layer
 
         Returns:
-            classifier_output: Model output of shape (batch_size x 1)
+            logits or (logits, attention_weights)
         """
-
         N, T = X.shape
 
         embedding_str = self.embedding_str(X)
-        pos = torch.arange(T).expand(N, T)
+        pos = torch.arange(T, device=X.device).expand(N, T)
         embedding_pos = self.embedding_pos(pos)
         embedding = embedding_str + embedding_pos
 
         cls = self.cls_token.expand(N, -1, -1)
+        encoder_input = torch.cat([cls, embedding], dim=1)
 
-        encoder_val = torch.cat([cls, embedding], dim=1)
-
-        attention_weights_l1 = []
+        attention_weights_l1: Optional[Tensor] = None
 
         for i, layer in enumerate(self.encoder_layers):
-
-            # Save the attention weights for the cls token (after the self attention forward pass)
-            def attn_hook(module, input, output):
-                attention_output, attention_weights = output
-                attention_weights_l1 = attention_weights[:, 0, :]
-
-            # Only add the forward hook for the first layer
             if i == 0 and get_attn_weights:
+
+                def attn_hook(module, input, output):
+                    _, attn = output
+                    nonlocal attention_weights_l1
+                    attention_weights_l1 = attn[:, 0, :]
+
                 handle = layer.self_attn.register_forward_hook(attn_hook)
 
-            encoder_val = layer(encoder_val)
+            encoder_input = layer(encoder_input)
 
             if i == 0 and get_attn_weights:
                 handle.remove()
 
-        cls_out = encoder_val[:, 0, :]
+        cls_out = encoder_input[:, 0, :]
+        logits = self.classifier(cls_out).squeeze(-1)
 
-        classifier_output = self.classifier(cls_out).squeeze(-1)
+        if get_attn_weights and attention_weights_l1 is not None:
+            return logits, attention_weights_l1
+        return logits
 
-        if get_attn_weights:
-            return classifier_output, attention_weights_l1
-        else:
-            return classifier_output
+    @staticmethod
+    def from_config(**config) -> "TransformerClassifier":
+        return TransformerClassifier(
+            vocab_size=config["vocab_size"],
+            embed_dim=config["embed_dim"],
+            num_heads=config["num_heads"],
+            ff_dim=config["ff_dim"],
+            dropout=config["dropout"],
+            max_length=config["max_length"],
+            num_encoder_layers=config["num_encoder_layers"],
+            class_hidden_dim=config["class_hidden_dim"],
+        )
