@@ -3,7 +3,7 @@ from torch import nn
 from TransformerClassifier import TransformerClassifier
 from train import generate_train_test, train, evaluate
 from sklearn.metrics import confusion_matrix, classification_report
-import data_process
+from data_process import get_input_from_text, Vocabulary, build_data
 
 def main():
 
@@ -20,7 +20,7 @@ def main():
     learning_rate = 1e-4
 
     # Download the data and generate train/test splits.
-    dataset, vocab_size = data_process.build_data()
+    dataset, vocab_size = build_data()
     train_loader, valid_loader, test_loader = generate_train_test(dataset=dataset, batch_size=batch_size)
     
     # Initialize the model, optimizer, and crtierion.
@@ -37,6 +37,11 @@ def main():
     cm = confusion_matrix(labels, preds)
     print(cm)
 
-    
     print(classification_report(labels, preds, target_names=["Ham", "Spam"]))
+
+def run_model(text=None):
+    text = "Testing spam text"
+    vocabulary = Vocabulary()
+    input = get_input_from_text(text, vocabulary)
+
 main()

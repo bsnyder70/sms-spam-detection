@@ -157,7 +157,28 @@ def preprocess_text(text):
     
     return words
 
+def get_top_k_words(tokens, attention_weights, vocabulary, k=3):
+    """
+    Return the top k attended to tokens (as given by attention_weights).
+    """
 
+    attention_weights_indexed = [(attention_weights[i],i) for i in range(len(attention_weights))]
+    attention_weights_indexed.sort(reverse=True)
 
+    top_k_attention_weights = attention_weights_indexed[:k]
+    top_k_tokens_idx = [tokens[i] for _, i in top_k_attention_weights]
+    top_k_tokens = [vocabulary.itos(idx) for idx in top_k_tokens_idx]
+
+    return top_k_tokens
+
+def get_input_from_text(text, vocabulary):
+    """
+    Clean and tokenize text in preparation for model inference.
+    """
+
+    words = preprocess_text(text)
+    words_idx = torch.tensor([vocabulary[word] for word in words_idx]).reshape(1, -1)
+
+    return words_idx
 
 build_data()
