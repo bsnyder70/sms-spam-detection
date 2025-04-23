@@ -1,9 +1,21 @@
 import torch
 from torch import nn
 
+
 class TransformerClassifier(nn.Module):
 
-    def __init__(self, vocab_size, embed_dim, num_heads, ff_dim, dropout, max_length, num_encoder_layers, class_hidden_dim):
+    def __init__(
+        self,
+        vocab_size,
+        embed_dim,
+        num_heads,
+        ff_dim,
+        dropout,
+        max_length,
+        num_encoder_layers,
+        class_hidden_dim,
+        **kwargs,
+    ):
         """
         Initializes our Transformer Classifier.
 
@@ -13,20 +25,28 @@ class TransformerClassifier(nn.Module):
 
         super(TransformerClassifier, self).__init__()
 
-        self.vocab_size = 3963
-        self.embed_dim = 128
-        self.num_heads = 4
-        self.ff_dim = 128
-        self.dropout = 0.3
-        self.max_length = 180
-        self.num_encoder_layers = 2
-        self.class_hidden_dim = 64
+        self.vocab_size = vocab_size
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.ff_dim = ff_dim
+        self.dropout = dropout
+        self.max_length = max_length
+        self.num_encoder_layers = num_encoder_layers
+        self.class_hidden_dim = class_hidden_dim
 
         self.embedding_str = nn.Embedding(self.vocab_size, self.embed_dim)
         self.embedding_pos = nn.Embedding(self.max_length, self.embed_dim)
 
-        self.encoder_layer = nn.TransformerEncoderLayer(d_model=self.embed_dim, nhead=self.num_heads, dim_feedforward=self.ff_dim, dropout=self.dropout, batch_first=True)
-        self.encoder = nn.TransformerEncoder(self.encoder_layer, num_layers=self.num_encoder_layers)
+        self.encoder_layer = nn.TransformerEncoderLayer(
+            d_model=self.embed_dim,
+            nhead=self.num_heads,
+            dim_feedforward=self.ff_dim,
+            dropout=self.dropout,
+            batch_first=True,
+        )
+        self.encoder = nn.TransformerEncoder(
+            self.encoder_layer, num_layers=self.num_encoder_layers
+        )
 
         self.cls_token = nn.Parameter(torch.randn(1, 1, self.embed_dim))
 
@@ -34,7 +54,6 @@ class TransformerClassifier(nn.Module):
             nn.Linear(self.embed_dim, self.class_hidden_dim),
             nn.ReLU(),
             nn.Linear(self.class_hidden_dim, 1),
-            nn.Sigmoid()
         )
 
     def forward(self, X):
@@ -65,4 +84,3 @@ class TransformerClassifier(nn.Module):
         classifier_output = self.classifier(cls_out).squeeze(-1)
 
         return classifier_output
-
