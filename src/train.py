@@ -84,6 +84,7 @@ def train(model, train_loader, valid_loader, optimizer, criterion, num_epochs):
         print(f"Epoch {epoch_idx+1}/{num_epochs} | Train Loss: {total_loss:.4f} | Train Acc: {train_acc:.4f} | Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.4f}")
     
     return train_acc, total_loss, val_acc, val_loss
+
 def evaluate(model, data_loader, criterion):
     """
     Evaluate the model on given data using a provided criterion.

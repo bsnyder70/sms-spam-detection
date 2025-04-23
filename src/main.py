@@ -15,13 +15,12 @@ from torch import nn
 from TransformerClassifier import TransformerClassifier
 from train import generate_train_test, evaluate
 from sklearn.metrics import confusion_matrix, classification_report
-import data_process
+from data_process import get_input_from_text, Vocabulary, build_data
 
 
 def main():
-    # Download the data and generate train/test splits.
-    dataset, vocab_size = data_process.build_data()
 
+    dataset, vocab_size = build_data()
     # Train the model.
     config = default_config.copy()
 
@@ -150,4 +149,14 @@ def main():
 
 
 #     print(classification_report(labels, preds, target_names=["Ham", "Spam"]))
+# main()
+#     print(classification_report(labels, preds, target_names=["Ham", "Spam"]))
+
+
+def run_model(text=None):
+    text = "Testing spam text"
+    vocabulary = Vocabulary()
+    input = get_input_from_text(text, vocabulary)
+
+
 main()
