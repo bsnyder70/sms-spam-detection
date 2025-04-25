@@ -136,12 +136,13 @@ def main():
     print(classification_report(labels, preds, target_names=["Ham", "Spam"]))
 
 
-def run_model(text=None):
+def run_model(text=None, model_path='outputs/bce_model_tst.pth'):
     """ Run inference on a saved model and output the prediction + Top K words. """
 
     config = default_config.copy()
 
-    text = "Thanks for your subscription to Ringtone UK your mobile will be charged �5/month Please confirm by"
+    if not text:
+        text = "Thanks for your subscription to Ringtone UK your mobile will be charged �5/month Please confirm by"
     
     # Load the Vocabulary object from the file
     filename = 'cache/vocab.pkl'
@@ -157,7 +158,7 @@ def run_model(text=None):
 
     # Load the existing model
     model = TransformerClassifier.from_config(**config)
-    model_state_path = 'outputs/bce_model_tst.pth'
+    model_state_path = model_path
     model_state = torch.load(model_state_path)
     model.load_state_dict(model_state)
     model.eval()
