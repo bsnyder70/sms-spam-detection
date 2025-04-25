@@ -5,6 +5,7 @@ import kagglehub
 from torch.utils.data import Dataset
 import re
 from collections import Counter
+import pickle
 
 class SpamDataset(Dataset):
 
@@ -72,7 +73,7 @@ def download_data():
 
     return path
 
-def build_data():
+def build_data(save_vocab_to_file=False):
     """
     Download, process, and format the dataset. The major steps include:
     1) Download dataset and load into a Pandas DataFrame.
@@ -113,6 +114,12 @@ def build_data():
     vocab = Vocabulary(min_freq=2)
     vocab.build_vocab(examples)
     vocab_size = len(vocab)
+
+    # Save the Vocabulary to a file
+    if save_vocab_to_file:
+        filename = 'cache/vocab.pkl'
+        with open(filename, 'wb') as file:
+            pickle.dump(vocab, file)
 
     # Map the words to ids
     examples_tensor = torch.tensor([[vocab[word] for word in example] for example in examples])

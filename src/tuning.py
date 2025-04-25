@@ -1,5 +1,5 @@
 import os
-from src.types.interfaces import SupportsFromConfig
+from interfaces import SupportsFromConfig
 import torch
 from train import generate_train_test
 from utils.plots import plot_multiple_losses

@@ -2,15 +2,17 @@ import torch
 from typing import Callable
 import tqdm
 
-
-
 def train_epoch(
     model, 
     dataloader, 
     optimizer, 
     device,             
-    loss_fn: Callable[[torch.Tensor, torch.Tensor], float],
+    loss_fn,
 ) -> tuple[float, float]:
+    """
+    XXX
+    """
+
     model.train()
     total_loss = 0
     correct = 0
@@ -39,11 +41,14 @@ def validate_epoch(
     model,
     dataloader,
     device,
-    loss_fn: Callable[[torch.Tensor, torch.Tensor], float],
+    loss_fn,
 ) -> tuple[float, float, list, list]:
     """
     Evaluates the model on the given dataloader.
 
+    Parameters:
+    XXX
+    
     Returns:
         val_loss: Average loss over the dataset
         val_acc: Accuracy over the dataset

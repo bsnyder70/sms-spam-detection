@@ -20,7 +20,7 @@ from data_process import get_input_from_text, Vocabulary, build_data
 
 def main():
 
-    dataset, vocab_size = build_data()
+    dataset, vocab_size = build_data(save_vocab_to_file=True)
     config = default_config.copy()
     config["vocab_size"] = vocab_size
 
@@ -32,24 +32,24 @@ def main():
     optimizer = torch.optim.Adam(model.parameters(), lr=config["learning_rate"])
     wrapped_loss = get_loss_wrapper(binary_cross_entropy_loss, apply_sigmoid=True)
 
-    # train(
-    #     num_epochs=config["num_epochs"],
-    #     train=train_loader,
-    #     valid=valid_loader,
-    #     model=model,
-    #     optimizer=optimizer,
-    #     device="cpu",
-    #     loss_fn=wrapped_loss,
-    #     save_path="outputs/bce_model.pth",
-    # )
+    train(
+        num_epochs=config["num_epochs"],
+        train=train_loader,
+        valid=valid_loader,
+        model=model,
+        optimizer=optimizer,
+        device="cpu",
+        loss_fn=wrapped_loss,
+        save_path="outputs/bce_model_tst.pth",
+    )
 
     # # Tune the model
 
     # 1. grab config from config.py
-    model_config = default_config.copy()
+    #model_config = default_config.copy()
 
     # binary cross entropy loss
-    tuning(model_config, dataset, model, wrapped_loss)
+    #tuning(model_config, dataset, model, wrapped_loss)
 
     # # weighted binary cross entropy loss
     # # Compute pos_weight for spam vs ham
@@ -128,20 +128,17 @@ def main():
     #     "outputs/focal_sweep_summary.csv", index=False
     # )
 
+    test_loss, test_acc, preds, labels = evaluate(model, test_loader, wrapped_loss)
 
-#     cm = confusion_matrix(labels, preds)
-#     print(cm)
-
-
-#     print(classification_report(labels, preds, target_names=["Ham", "Spam"]))
-# main()
-#     print(classification_report(labels, preds, target_names=["Ham", "Spam"]))
+    cm = confusion_matrix(labels, preds)
+    print(cm)
+    print(classification_report(labels, preds, target_names=["Ham", "Spam"]))
 
 
-# def run_model(text=None):
-#     text = "Testing spam text"
-#     vocabulary = Vocabulary()
-#     input = get_input_from_text(text, vocabulary)
+def run_model(text=None):
+    text = "Testing spam text"
+    vocabulary = Vocabulary()
+    input = get_input_from_text(text, vocabulary)
 
 
 main()
