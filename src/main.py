@@ -9,13 +9,14 @@ from utils.loss import (
     weighted_bce_with_logits_loss,
 )
 from model.config import default_config
-
 import torch
 from torch import nn
 from model.TransformerClassifier import TransformerClassifier
 from train import generate_train_test, evaluate
 from sklearn.metrics import confusion_matrix, classification_report
-from data_process import get_input_from_text, Vocabulary, build_data
+from data_process import get_input_from_text, Vocabulary, build_data, get_top_k_words
+import os
+import pickle
 
 
 def main():
@@ -136,9 +137,47 @@ def main():
 
 
 def run_model(text=None):
-    text = "Testing spam text"
-    vocabulary = Vocabulary()
+    """ Run inference on a saved model and output the prediction + Top K words. """
+
+    config = default_config.copy()
+
+    text = "Congrats! Year, free money scams spam"
+    
+    # Load the Vocabulary object from the file
+    filename = 'cache/vocab.pkl'
+    if os.path.exists(filename):
+        with open(filename, 'rb') as file:
+            vocabulary = pickle.load(file)
+    else:
+        print("Missing Vocabulary file. Try rebuilding the dataset.")
+        return
+
+    # Tokenize the input text
     input = get_input_from_text(text, vocabulary)
 
+    # Load the existing model
+    model = TransformerClassifier.from_config(**config)
+    model_state_path = 'outputs/bce_model_tst.pth'
+    model_state = torch.load(model_state_path)
+    model.load_state_dict(model_state)
+    model.eval()
 
-main()
+    logits, attention_weights = model.forward(input, get_attn_weights=True)
+    vals = torch.sigmoid(logits)
+
+    # Calculate probabilities and Top K
+    if vals[0] < 0.5:
+        likelihood = (0.5 - vals[0]) * 200
+        typ = "Not Spam"
+    else:
+        likelihood = (vals[0] - 0.5) * 200
+        typ = "Spam"
+
+    print(f"The message is classified as {typ} with a probability of {likelihood}%")
+
+    top_k_words = get_top_k_words(input.squeeze(0).tolist(), attention_weights.squeeze(0).tolist()[1:], vocabulary)
+
+    print(f"The top words that were used to determines this are: {",".join(top_k_words)}")
+
+#main()
+run_model()
