@@ -28,7 +28,7 @@ class Vocabulary():
         """
 
         if special_tokens is None:
-            self.special_tokens = ['<cls>','<eos>','<pad>','<unk>']
+            self.special_tokens = ['<eos>','<pad>','<unk>']
 
         self.stoi = {token: idx for idx, token in enumerate(self.special_tokens)}
         self.itos = {idx: token for idx, token in enumerate(self.special_tokens)} 

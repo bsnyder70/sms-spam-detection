@@ -141,7 +141,7 @@ def run_model(text=None):
 
     config = default_config.copy()
 
-    text = "Congrats! Year, free money scams spam"
+    text = "Thanks for your subscription to Ringtone UK your mobile will be charged �5/month Please confirm by"
     
     # Load the Vocabulary object from the file
     filename = 'cache/vocab.pkl'

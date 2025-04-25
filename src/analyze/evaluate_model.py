@@ -11,7 +11,7 @@ default_config = {
     "num_epochs": 10,
     "learning_rate": 1e-4,
     # Model architecture parameters
-    "vocab_size": 3963,
+    "vocab_size": 3961,
     "embed_dim": 128,
     "num_heads": 4,
     "ff_dim": 128,
