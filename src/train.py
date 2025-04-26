@@ -34,7 +34,7 @@ def generate_train_test(dataset, batch_size):
     return train_loader, valid_loader, test_loader
 
 
-def train(model, train_loader, valid_loader, optimizer, criterion, num_epochs):
+def train(model, train_loader, valid_loader, optimizer, criterion, num_epochs, save_path):
     """
     Trains the model using given train/validation sets with
     the provided optimizer and criterion.
@@ -87,48 +87,50 @@ def train(model, train_loader, valid_loader, optimizer, criterion, num_epochs):
     return train_acc, total_loss, val_acc, val_loss
 
 
-def evaluate(model, data_loader, criterion):
+def evaluate(model, data_loader, criterion, device):
     """
     Evaluate the model on given data using a provided criterion.
 
     Parameters:
-        model: Model to evaluate
-        data_loader: Dataset to use for evaluating the model
-        criterion: Criterion to use for calculating loss
+        model: Model to evaluate (already .to(device))
+        data_loader: Dataset to use for evaluation
+        criterion: Loss function
+        device: torch.device
 
     Returns:
-        avg_loss: Average loss over all the batches
-        acc: Accuracy over all the batches
-        tot_preds: All the predicted labels over all the batches.
-        tot_labels: All the real labels over all the batches
+        avg_loss, accuracy, all_preds, all_labels
     """
-
     model.eval()
     total_loss = 0
     correct = 0
     total = 0
 
-    tot_preds = []
-    tot_labels = []
+    all_preds = []
+    all_labels = []
 
-    for batch_idx, (examples, labels) in enumerate(data_loader):
+    with torch.no_grad():
+        for examples, labels in data_loader:
+            # move to device
+            examples = examples.to(device)
+            labels   = labels.to(device)
 
-        outputs = model(examples)
-        loss = criterion(outputs, labels)
+            outputs = model(examples)
+            loss = criterion(outputs, labels)
 
-        total_loss += loss.item()
-        preds = (outputs > 0.5).float()
+            total_loss += loss.item()
+            preds = (outputs > 0.5).float()
 
-        correct += (preds == labels).sum().item()
-        total += labels.size(0)
+            correct += (preds == labels).sum().item()
+            total += labels.size(0)
 
-        tot_preds.extend(preds)
-        tot_labels.extend(labels)
+            all_preds.extend(preds.cpu())
+            all_labels.extend(labels.cpu())
 
     avg_loss = total_loss / len(data_loader)
     acc = correct / total
 
-    return avg_loss, acc, tot_preds, tot_labels
+    return avg_loss, acc, all_preds, all_labels
+
 
 
 # generate_train_test()

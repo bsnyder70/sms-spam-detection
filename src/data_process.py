@@ -1,11 +1,17 @@
+import os
+
 import torch
-import numpy as np
 import pandas as pd
 import kagglehub
+from nltk import PorterStemmer
 from torch.utils.data import Dataset
 import re
 from collections import Counter
 import pickle
+from transformers import BertTokenizerFast
+
+_wp_tokenizer = BertTokenizerFast.from_pretrained("bert-base-uncased", do_lower_case=True)
+ps = PorterStemmer()
 
 class SpamDataset(Dataset):
 
@@ -81,7 +87,7 @@ def download_data():
 
     return path
 
-def build_data(save_vocab_to_file=False):
+def build_data(preprocess_fn, save_vocab_to_file=False, vocab_path='cache/vocab.pkl'):
     """
     Download, process, and format the dataset. The major steps include:
     1) Download dataset and load into a Pandas DataFrame.
@@ -111,7 +117,7 @@ def build_data(save_vocab_to_file=False):
     # Need to go through all the vocabulary, map to integers, calculate the size of vocab, add other tokens (cls, etc)
 
     # Clean and tokenize the example text.
-    df['examples'] = df['examples'].apply(preprocess_text)
+    df['examples'] = df['examples'].apply(preprocess_fn)
 
     # Convert the labels to tensors
     labels = torch.tensor(df['labels'].values, dtype=torch.float)
@@ -125,8 +131,8 @@ def build_data(save_vocab_to_file=False):
 
     # Save the Vocabulary to a file
     if save_vocab_to_file:
-        filename = 'cache/vocab.pkl'
-        with open(filename, 'wb') as file:
+        os.makedirs(os.path.dirname(vocab_path), exist_ok=True)
+        with open(vocab_path, 'wb') as file:
             pickle.dump(vocab, file)
 
     # Map the words to ids
@@ -136,7 +142,7 @@ def build_data(save_vocab_to_file=False):
 
     return spam_dataset, vocab_size
 
-def preprocess_text(text):
+def preprocess_text_minimal(text):
     """
     Preprocess and tokenize the example text. 
 
@@ -171,6 +177,95 @@ def preprocess_text(text):
     
     return words
 
+
+def preprocess_text(text):
+    """
+    Preprocess and tokenize the example text.
+    Replaces URLs/emails, keeps numbers, cleans text.
+    """
+
+    MAX_SEQ_LEN = 180
+    text = re.sub(r"(https?:\/\/\S+)", "<url>", text)
+    text = re.sub(r"\S+@\S+", "<email>", text)
+
+    text = re.sub(r'[,]', ' ', text)
+    text = re.sub(r'[^a-zA-Z0-9@.<>\s]', '', text)  # keep numbers and tokens
+    text = text.lower()
+    words = text.split(" ")
+
+    words = [w for w in words if w != '']  # remove empty
+    words.insert(0, "<cls>")
+    words.append("<eos>")
+    words += ["<pad>"] * (MAX_SEQ_LEN - len(words)) if len(words) < MAX_SEQ_LEN else words[:MAX_SEQ_LEN]
+
+    return words
+
+
+def preprocess_no_special_tokens(text):
+    text = re.sub(r"(https?:\/\/\S+)", "<url>", text)
+    text = re.sub(r"\S+@\S+", "<email>", text)
+    text = re.sub(r'[,]', ' ', text)
+    text = re.sub(r'[^a-zA-Z0-9@.<>\s]', '', text)
+    text = text.lower()
+    words = text.split(" ")
+    words = [w for w in words if w != '']
+    MAX_SEQ_LEN = 180
+    words += ["<pad>"] * (MAX_SEQ_LEN - len(words)) if len(words) < MAX_SEQ_LEN else words[:MAX_SEQ_LEN]
+
+    return words
+
+
+def preprocess_raw(text):
+    text = text.lower()
+    words = text.split()
+    words.insert(0, "<cls>")
+    words.append("<eos>")
+    MAX_SEQ_LEN = 180
+    words += ["<pad>"] * (MAX_SEQ_LEN - len(words)) if len(words) < MAX_SEQ_LEN else words[:MAX_SEQ_LEN]
+
+    return words
+
+
+def preprocess_stemmed(text):
+    text = re.sub(r"(https?:\/\/\S+)", "<url>", text)
+    text = re.sub(r"\S+@\S+", "<email>", text)
+    text = re.sub(r'[,]', ' ', text)
+    text = re.sub(r'[^a-zA-Z0-9@.<>\s]', '', text)
+    text = text.lower()
+    words = [ps.stem(w) for w in text.split() if w]
+    words.insert(0, "<cls>")
+    words.append("<eos>")
+    MAX_SEQ_LEN = 180
+    words += ["<pad>"] * (MAX_SEQ_LEN - len(words)) if len(words) < MAX_SEQ_LEN else words[:MAX_SEQ_LEN
+                                                                                     ]
+    return words
+
+def preprocess_wordpiece(text):
+    """
+    Tokenize using BERT WordPiece (via HuggingFace).
+    - Cleans URLs/emails the same way as preprocess_text
+    - Adds <cls> / <eos>, pads/truncates to MAX_SEQ_LEN
+    """
+    MAX_SEQ_LEN = 180
+
+    text = re.sub(r"(https?:\/\/\S+)", "<url>", text)
+    text = re.sub(r"\S+@\S+", "<email>", text)
+    text = re.sub(r'[,]', ' ', text)
+    text = re.sub(r'[^a-zA-Z0-9@.<>\s]', '', text)
+    text = text.lower()
+
+    pieces = _wp_tokenizer.tokenize(text)
+
+    tokens = ["<cls>"] + pieces + ["<eos>"]
+
+    if len(tokens) < MAX_SEQ_LEN:
+        tokens += ["<pad>"] * (MAX_SEQ_LEN - len(tokens))
+    else:
+        tokens = tokens[:MAX_SEQ_LEN]
+
+    return tokens
+
+
 def get_top_k_words(tokens, attention_weights, vocabulary, k=3):
     """
     Return the top k attended to tokens (as given by attention_weights).
@@ -204,5 +299,3 @@ def get_input_from_text(text, vocabulary):
     words_idx = torch.tensor([vocabulary[word] for word in words]).reshape(1, -1)
 
     return words_idx
-
-build_data()
