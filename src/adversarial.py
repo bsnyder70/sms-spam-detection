@@ -29,8 +29,8 @@ def text_to_tensor(text):
 
 
 model = TransformerClassifier(
-    vocab_size=len(vocab), embed_dim=128, num_heads=4,
-    ff_dim=128, dropout=0.0, max_length=180,
+    vocab_size=len(vocab), embed_dim=256, num_heads=4,
+    ff_dim=128, dropout=0.3, max_length=180,
     num_encoder_layers=2, class_hidden_dim=64
 )
 model.load_state_dict(torch.load("outputs/wordpiece_focal_model.pth", map_location=device))
