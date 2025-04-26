@@ -1,3 +1,5 @@
+from matplotlib import pyplot as plt
+import numpy as np
 from src.data_process import build_data
 from model.TransformerClassifier import TransformerClassifier
 from src.train import generate_train_test
@@ -60,6 +62,45 @@ def evaluate_from_path(
         "\nClassification Report:\n",
         classification_report(all_labels, all_preds, target_names=["Ham", "Spam"]),
     )
+
+
+@torch.no_grad()
+def plot_prediction_confidence(model, dataloader, device="cuda"):
+
+    model.eval()
+    model.to(device)
+
+    all_probs = []
+    all_labels = []
+
+    for inputs, labels in dataloader:
+        inputs = inputs.to(device)
+        labels = labels.to(device)
+
+        outputs = model(inputs)  # assumed logits
+        probs = torch.sigmoid(outputs).squeeze()  # (batch,) if binary classification
+
+        all_probs.extend(probs.cpu().numpy())
+        all_labels.extend(labels.cpu().numpy())
+
+    all_probs = np.array(all_probs)
+    all_labels = np.array(all_labels)
+
+    plt.figure(figsize=(10, 6))
+    plt.hist(
+        all_probs[all_labels == 0], bins=20, alpha=0.6, label="Ham (0)", color="skyblue"
+    )
+    plt.hist(
+        all_probs[all_labels == 1], bins=20, alpha=0.6, label="Spam (1)", color="salmon"
+    )
+    plt.axvline(0.5, color="gray", linestyle="--", label="Decision Threshold")
+    plt.title("Prediction Confidence Histogram (Test Set)")
+    plt.xlabel("Predicted Probability")
+    plt.ylabel("Frequency")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig("outputs/prediction_confidence_histogram.png")
 
 
 if __name__ == "__main__":

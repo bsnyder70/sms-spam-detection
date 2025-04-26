@@ -2,7 +2,6 @@ from typing import Optional
 import torch
 from torch import nn
 from torch import Tensor
-from torch.nn import functional as F
 from typing import Tuple, Union
 
 
