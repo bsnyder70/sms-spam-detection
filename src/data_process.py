@@ -28,10 +28,10 @@ class Vocabulary():
         """
 
         if special_tokens is None:
-            special_tokens = ['<cls>','<eos>','<pad>','<unk>']
+            self.special_tokens = ['<cls>','<eos>','<pad>','<unk>']
 
-        self.stoi = {token: idx for idx, token in enumerate(special_tokens)}
-        self.itos = {idx: token for idx, token in enumerate(special_tokens)} 
+        self.stoi = {token: idx for idx, token in enumerate(self.special_tokens)}
+        self.itos = {idx: token for idx, token in enumerate(self.special_tokens)} 
         self.min_freq = min_freq
 
     def __len__(self):
@@ -64,6 +64,14 @@ class Vocabulary():
     def get_itos(self):
         """ Return the index-to-string mapping. """
         return self.itos
+    
+    def get_specials(self):
+        """ Return ids of all special tokens. """
+        ids = []
+        for special in self.special_tokens:
+            ids.append(self.stoi[special])
+        
+        return ids
 
 def download_data():
     """ Downloads the Spam Collection dataset using the Kaggle API """
@@ -153,10 +161,9 @@ def preprocess_text(text):
     text = text.lower()
 
     # Split on whitespace (and commas due to the above regex) to create tokens
-    words = text.split(" ")
+    words = text.split()
     
-    # Insert cls and end of sentence token, then pad up to the max sequence length.
-    words.insert(0, "<cls>")
+    # Insert end of sentence token, then pad up to the max sequence length.
     words.append("<eos>")
 
     for i in range(len(words), MAX_SEQ_LEN):
@@ -169,12 +176,22 @@ def get_top_k_words(tokens, attention_weights, vocabulary, k=3):
     Return the top k attended to tokens (as given by attention_weights).
     """
 
+    # Sort the attention weights, removing all special tokens as necessary
     attention_weights_indexed = [(attention_weights[i],i) for i in range(len(attention_weights))]
-    attention_weights_indexed.sort(reverse=True)
+    attention_weights_pruned = []
+    for weight, index in attention_weights_indexed:
+        if tokens[index] not in vocabulary.get_specials():
+            attention_weights_pruned.append((weight,index))
 
-    top_k_attention_weights = attention_weights_indexed[:k]
+    attention_weights_pruned.sort(reverse=True)    
+    
+    #print([vocabulary.itos[idx] for idx in tokens])
+    #print(attention_weights_pruned)
+
+    # Get top K non-special tokens
+    top_k_attention_weights = attention_weights_pruned[:k]
     top_k_tokens_idx = [tokens[i] for _, i in top_k_attention_weights]
-    top_k_tokens = [vocabulary.itos(idx) for idx in top_k_tokens_idx]
+    top_k_tokens = [vocabulary.itos[idx] for idx in top_k_tokens_idx]
 
     return top_k_tokens
 
@@ -184,7 +201,7 @@ def get_input_from_text(text, vocabulary):
     """
 
     words = preprocess_text(text)
-    words_idx = torch.tensor([vocabulary[word] for word in words_idx]).reshape(1, -1)
+    words_idx = torch.tensor([vocabulary[word] for word in words]).reshape(1, -1)
 
     return words_idx
 
