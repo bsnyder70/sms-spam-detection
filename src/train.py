@@ -1,10 +1,11 @@
 import os
 from sklearn.metrics import f1_score, precision_score, recall_score
+from interfaces import SupportsFromConfig
 import torch
 from typing import Callable, Any
 from torch.utils.data import DataLoader
 from training.trainer import train_epoch, validate_epoch
-from src.types.interfaces import SupportsFromConfig
+
 from utils.plots import plot_learning_curves
 
 

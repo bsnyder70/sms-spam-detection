@@ -1,11 +1,22 @@
 import os
+import random
 import pickle
+import torch
 import pandas as pd
-from analyze.evaluate_model import (
-    plot_prediction_confidence,
+from sklearn.metrics import (
+    classification_report,
+    confusion_matrix,
 )
+
+import numpy as np
+
 from train import train
+from training.trainer import validate_epoch
 from tuning import tuning
+
+from model.config import default_config, focal_best_config
+from model.TransformerClassifier import TransformerClassifier
+
 from utils.loss import (
     FocalLoss,
     binary_cross_entropy_loss,
@@ -13,12 +24,22 @@ from utils.loss import (
     get_pos_weight,
     weighted_bce_with_logits_loss,
 )
-from model.config import default_config, focal_best_config
 
-import torch
-from model.TransformerClassifier import TransformerClassifier
-from data_process import get_input_from_text, Vocabulary, build_data, get_top_k_words
 from utils.splits import generate_kfold_splits, generate_stratified_splits
+from analyze.evaluate_model import plot_prediction_confidence
+
+from data_process import (
+    build_data,
+    preprocess_text,
+    preprocess_text_minimal,
+    preprocess_no_special_tokens,
+    preprocess_raw,
+    preprocess_stemmed,
+    preprocess_wordpiece,
+    get_input_from_text,
+    get_top_k_words,
+)
+
 
 
 # ale experiement section
@@ -144,12 +165,76 @@ def run_tuning():
         "outputs/focal_sweep_summary.csv", index=False
     )
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+def seed_everything(seed: int = 42):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 def main():
+    seed_everything(42)
 
-    # ale experiment section
-    run_training()
-    # run_tuning()
+    # Map a name to each preprocessing strategy
+    strategies = {
+        'default': preprocess_text,
+        'minimal': preprocess_text_minimal,
+        'no_special': preprocess_no_special_tokens,
+        'raw': preprocess_raw,
+        'stemmed': preprocess_stemmed,
+        'wordpiece': preprocess_wordpiece
+    }
+
+    for name, proc_fn in strategies.items():
+        print(f"\n\n=== Training with '{name}' tokenization ===")
+
+        vocab_file_path = f"cache/{name}.vocab.pkl"
+        # Rebuild dataset & vocabulary with this strategy
+        dataset, vocab_size = build_data(preprocess_fn=proc_fn, save_vocab_to_file=True, vocab_path=vocab_file_path)
+
+        config = default_config.copy()
+        config["vocab_size"] = vocab_size
+
+        train_loader, valid_loader, test_loader = generate_stratified_splits(
+            dataset=dataset,
+            batch_size=config["batch_size"]
+        )
+
+        criterion = FocalLoss(alpha=0.5, gamma=1.0)
+        loss_used = 'focal'
+
+        # criterion = get_loss_wrapper(binary_cross_entropy_loss, apply_sigmoid=True)
+        # loss_used = 'BCE'
+
+        # Save each model under a distinct name
+        save_path = f"outputs/{name}_{loss_used}_model.pth"
+        model = train(
+            config=config,
+            model_cls=TransformerClassifier,
+            train=train_loader,
+            valid=valid_loader,
+            loss_fn=criterion,
+            save_path=save_path,
+        )
+
+        # Evaluate on test set
+        test_loss, test_acc, preds, labels = validate_epoch(
+            model,
+            test_loader,
+            device=device,
+            loss_fn=criterion,
+        )
+        print(f"[{name}] Test Loss: {test_loss:.4f} | Test Acc: {test_acc:.4f}")
+        cm = confusion_matrix(labels, preds)
+        print(cm)
+        print(classification_report(labels, preds, target_names=["Ham", "Spam"]))
+
+
 
 
 def run_model(text=None):
@@ -200,5 +285,5 @@ def run_model(text=None):
     )
 
 
-# main()
+main()
 run_model()

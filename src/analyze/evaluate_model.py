@@ -2,9 +2,10 @@ from matplotlib import pyplot as plt
 import numpy as np
 from src.data_process import build_data
 from model.TransformerClassifier import TransformerClassifier
-from src.train import generate_train_test
 from sklearn.metrics import confusion_matrix, classification_report
 import torch
+
+from utils.splits import generate_stratified_splits
 
 # Default config for initializing model
 default_config = {
@@ -13,7 +14,7 @@ default_config = {
     "num_epochs": 10,
     "learning_rate": 1e-4,
     # Model architecture parameters
-    "vocab_size": 3963,
+    "vocab_size": 3961,
     "embed_dim": 128,
     "num_heads": 4,
     "ff_dim": 128,
@@ -105,7 +106,7 @@ def plot_prediction_confidence(model, dataloader, device="cuda"):
 
 if __name__ == "__main__":
     dataset, _ = build_data()
-    _, _, test_loader = generate_train_test(
+    _, _, test_loader = generate_stratified_splits(
         dataset=dataset, batch_size=default_config["batch_size"]
     )
 

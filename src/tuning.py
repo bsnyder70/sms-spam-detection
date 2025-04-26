@@ -2,6 +2,7 @@ import os
 from typing import Any, List, Tuple
 
 import numpy as np
+from interfaces import SupportsFromConfig
 import torch
 from torch.utils.data import Subset, DataLoader
 
