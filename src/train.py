@@ -1,136 +1,68 @@
+import os
+from sklearn.metrics import f1_score, precision_score, recall_score
+from interfaces import SupportsFromConfig
 import torch
-from torch import nn
-import numpy as np
-from torch.utils.data import random_split, DataLoader
+from typing import Callable, Any
+from torch.utils.data import DataLoader
+from training.trainer import train_epoch, validate_epoch
+
+from utils.plots import plot_learning_curves
 
 
-def generate_train_test(dataset, batch_size):
-    """
-    Generates train / validation / test DataLoader sets from our data set.
+def train(
+    config: dict[str, Any],
+    model_cls: SupportsFromConfig,
+    train: DataLoader,
+    valid: DataLoader,
+    loss_fn: Callable[[Any, Any], float],
+    save_path: str = "outputs/model.pth",
+):
 
-    We use a train / val / test split of 0.7 / 0.15 / 0.15.
+    train_losses = []
+    val_losses = []
+    device = torch.device(config["device"] if torch.cuda.is_available() else "cpu")
 
-    Parameters:
-        dataset: Dataset to use
-        batch_size: Batch size for each DataLoader
+    model = model_cls.from_config(**config).to(device)
 
-    Returns:
-        Train / validation / test DataLoaders
-    """
+    optimizer = torch.optim.AdamW(model.parameters(), lr=config["learning_rate"])
 
-    # Separate into train/val/test sets
-    train_size = int(0.7 * len(dataset))
-    val_size = int(0.15 * len(dataset))
-    test_size = len(dataset) - (train_size + val_size)
+    for epoch in range(config["num_epochs"]):
+        print(f"\n Epoch {epoch+1}/{config['num_epochs']}")
 
-    train_dataset, val_dataset, test_dataset = random_split(
-        dataset, [train_size, val_size, test_size]
-    )
+        train_acc, train_loss = train_epoch(
+            model,
+            train,
+            optimizer,
+            device,
+            loss_fn=loss_fn,
+        )
+        print(f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.4f}")
+        train_losses.append(train_loss)
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
-    valid_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-
-    return train_loader, valid_loader, test_loader
-
-
-def train(model, train_loader, valid_loader, optimizer, criterion, num_epochs, save_path):
-    """
-    Trains the model using given train/validation sets with
-    the provided optimizer and criterion.
-
-    Parameters:
-        model: Model to train
-        train_loader: Training data set
-        valid_loader: Validation data set
-        optimizer: Optimizer to use for updating weights
-        criterion: Criterion to use for calculating loss
-        num_epochs: Number of epochs to train for
-
-    Returns:
-        train_acc: Final training accuracy
-        total_loss: Final training loss
-        val_acc: Final validation accuracy
-        val_loss: Final validation loss
-
-    """
-
-    for epoch_idx in range(num_epochs):
-
-        total_loss = 0
-        correct = 0
-        total = 0
-        model.train()
-
-        for batch_idx, (examples, labels) in enumerate(train_loader):
-
-            optimizer.zero_grad()
-            outputs = model.forward(examples)
-            loss = criterion(outputs, labels)
-
-            loss.backward()
-
-            optimizer.step()
-
-            total_loss += loss.item()
-            preds = (outputs > 0.5).float()
-            correct += (preds == labels).sum().item()
-            total += labels.size(0)
-
-        train_acc = correct / total
-        val_loss, val_acc, _, _ = evaluate(model, valid_loader, criterion)
-
-        print(
-            f"Epoch {epoch_idx+1}/{num_epochs} | Train Loss: {total_loss:.4f} | Train Acc: {train_acc:.4f} | Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.4f}"
+        val_loss, val_acc, all_preds, all_labels = validate_epoch(
+            model, valid, device, loss_fn
         )
 
-    return train_acc, total_loss, val_acc, val_loss
+        probs = torch.sigmoid(torch.tensor(all_preds))
+        binary_preds = (probs > 0.5).int().tolist()
 
+        print(f"Validation Loss: {val_loss:.4f} | Validation Acc: {val_acc:.4f}")
+        val_losses.append(val_loss)
 
-def evaluate(model, data_loader, criterion, device):
-    """
-    Evaluate the model on given data using a provided criterion.
+        # Calculate precision, recall, and F1 score
+        precision = precision_score(all_labels, binary_preds, zero_division=0)
+        recall = recall_score(all_labels, binary_preds, zero_division=0)
+        f1 = f1_score(all_labels, binary_preds, zero_division=0)
 
-    Parameters:
-        model: Model to evaluate (already .to(device))
-        data_loader: Dataset to use for evaluation
-        criterion: Loss function
-        device: torch.device
+        print(f"Precision: {precision:.4f} | Recall: {recall:.4f} | F1 Score: {f1:.4f}")
 
-    Returns:
-        avg_loss, accuracy, all_preds, all_labels
-    """
-    model.eval()
-    total_loss = 0
-    correct = 0
-    total = 0
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    torch.save(model.state_dict(), save_path)
+    print(f"Model saved to {save_path}")
 
-    all_preds = []
-    all_labels = []
+    plot_learning_curves(
+        train_losses, val_losses, save_path.replace(".pth", "_curve.png")
+    )
 
-    with torch.no_grad():
-        for examples, labels in data_loader:
-            # move to device
-            examples = examples.to(device)
-            labels   = labels.to(device)
-
-            outputs = model(examples)
-            loss = criterion(outputs, labels)
-
-            total_loss += loss.item()
-            preds = (outputs > 0.5).float()
-
-            correct += (preds == labels).sum().item()
-            total += labels.size(0)
-
-            all_preds.extend(preds.cpu())
-            all_labels.extend(labels.cpu())
-
-    avg_loss = total_loss / len(data_loader)
-    acc = correct / total
-
-    return avg_loss, acc, all_preds, all_labels
-
-
-
-# generate_train_test()
+    # return the model for further evaluation
+    return model

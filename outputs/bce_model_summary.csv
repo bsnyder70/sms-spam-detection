@@ -1,0 +1,2 @@
+param,f1,precision,recall,val_loss,train_loss,epoch,config,sweep_param,sweep_value,num_params,loss_label
+ff_dim,0.9295774647887324,0.9850746268656716,0.88,0.08500756518915295,0.0436368996177667,9,"{'batch_size': 32, 'num_epochs': 10, 'learning_rate': 0.0001, 'vocab_size': 3963, 'embed_dim': 128, 'num_heads': 4, 'ff_dim': 128, 'dropout': 0.0, 'max_length': 180, 'num_encoder_layers': 2, 'class_hidden_dim': 64}",ff_dim=128,128,737921,

@@ -10,13 +10,6 @@ def binary_cross_entropy_loss(
 ) -> float:
     """
     Computes the binary cross-entropy loss between predictions and targets.
-
-    Args:
-        predictions (torch.Tensor): Predicted probabilities (output of sigmoid).
-        targets (torch.Tensor): Ground truth labels (0 or 1).
-
-    Returns:
-        torch.Tensor: Computed binary cross-entropy loss.
     """
     bce_loss = nn.BCELoss()
     return bce_loss(predictions, targets)
@@ -25,12 +18,6 @@ def binary_cross_entropy_loss(
 def get_pos_weight(dataset: Dataset) -> float:
     """
     Computes the positive class weight to handle imbalance in binary classification.
-
-    Args:
-        dataset (Dataset): A PyTorch Dataset object with a `.labels` attribute.
-
-    Returns:
-        float: Ratio of negative to positive examples (neg / pos)
     """
     labels: Union[torch.Tensor, list[int]] = dataset.labels
 
@@ -46,12 +33,6 @@ def get_pos_weight(dataset: Dataset) -> float:
 def weighted_bce_with_logits_loss(pos_weight: float):
     """
     Returns a callable BCEWithLogitsLoss function with class imbalance handling.
-
-    Args:
-        pos_weight (float): Ratio of negative to positive examples (neg / pos).
-
-    Returns:
-        Callable: A function that computes BCEWithLogitsLoss with pos_weight.
     """
 
     def loss_fn(predictions: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
