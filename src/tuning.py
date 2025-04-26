@@ -2,10 +2,11 @@ import os
 from typing import Any, List, Tuple
 
 import numpy as np
-from src.types.interfaces import SupportsFromConfig
 import torch
 from torch.utils.data import Subset, DataLoader
-from src.types.results import BestResult
+
+from interfaces import SupportsFromConfig
+from results import BestResult
 from utils.plots import plot_multiple_losses
 from training.trainer import train_epoch, validate_epoch
 from sklearn.metrics import precision_score, recall_score, f1_score
