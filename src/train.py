@@ -10,13 +10,16 @@ from utils.plots import plot_learning_curves
 
 
 def train(
-    config: dict[str, Any],
-    model_cls: SupportsFromConfig,
-    train: DataLoader,
-    valid: DataLoader,
+    config,
+    model_cls,
+    train_data: DataLoader,
+    valid_data: DataLoader,
     loss_fn: Callable[[Any, Any], float],
-    save_path: str = "outputs/model.pth",
+    save_path = "outputs/model.pth",
 ):
+    """
+    Train the model using the given train/validation data sets and save the model.
+    """
 
     train_losses = []
     val_losses = []
@@ -29,18 +32,19 @@ def train(
     for epoch in range(config["num_epochs"]):
         print(f"\n Epoch {epoch+1}/{config['num_epochs']}")
 
-        train_acc, train_loss = train_epoch(
+        train_loss, train_acc = train_epoch(
             model,
-            train,
+            train_data,
             optimizer,
             device,
             loss_fn=loss_fn,
         )
+
         print(f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.4f}")
         train_losses.append(train_loss)
 
         val_loss, val_acc, all_preds, all_labels = validate_epoch(
-            model, valid, device, loss_fn
+            model, valid_data, device, loss_fn
         )
 
         probs = torch.sigmoid(torch.tensor(all_preds))
@@ -64,5 +68,4 @@ def train(
         train_losses, val_losses, save_path.replace(".pth", "_curve.png")
     )
 
-    # return the model for further evaluation
     return model

@@ -10,7 +10,11 @@ def train_epoch(
     loss_fn,
 ) -> tuple[float, float]:
     """
-    XXX
+    Trains the model for one epoch on the given dataloader.
+    
+    Returns:
+        train_loss: Accuracy over the dataset
+        train_acc: Average loss over the dataset
     """
 
     model.train()
@@ -35,7 +39,7 @@ def train_epoch(
     train_acc = correct / total
     train_loss = total_loss / len(dataloader)
 
-    return train_acc, train_loss
+    return train_loss, train_acc
 
 def validate_epoch(
     model,
@@ -45,9 +49,6 @@ def validate_epoch(
 ) -> tuple[float, float, list, list]:
     """
     Evaluates the model on the given dataloader.
-
-    Parameters:
-    XXX
     
     Returns:
         val_loss: Average loss over the dataset

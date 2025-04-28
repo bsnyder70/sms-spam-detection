@@ -1,5 +1,4 @@
 import os
-
 import torch
 import pandas as pd
 import kagglehub
@@ -14,9 +13,10 @@ _wp_tokenizer = BertTokenizerFast.from_pretrained(
     "bert-base-uncased", do_lower_case=True
 )
 ps = PorterStemmer()
-
+MAX_SEQ_LEN = 180
 
 class SpamDataset(Dataset):
+    """ Dataset containing tokenized vocabulary indices as examples and Spam/Ham booleans as labels. """
 
     def __init__(self, labels, examples):
         self.labels = labels
@@ -30,6 +30,7 @@ class SpamDataset(Dataset):
 
 
 class Vocabulary:
+    """ Stores all of the mappings between word tokens and integer tokens. """
 
     def __init__(self, min_freq=2, special_tokens=None):
         """
@@ -104,12 +105,13 @@ def build_data(preprocess_fn, save_vocab_to_file=False, vocab_path="cache/vocab.
     4) Convert the examples and labels into Tensors and load into a custom Torch DataSet.
 
     Parameters:
-        None
+        preprocess_fn: Signifies which pre-processing technique to use
+        save_vocab_to_file: If enabled, saves the built vocabulary to a file
+        vocab_path: Defines where to save vocabulary object (if applicable)
 
     Returns:
        SpamDataset: Custom Torch Dataset used to store all the examples
        vocab_size: The number of unique tokens stored in the vocabulary
-
     """
 
     # Download data from Kaggle
@@ -155,7 +157,10 @@ def build_data(preprocess_fn, save_vocab_to_file=False, vocab_path="cache/vocab.
 
 def preprocess_text_minimal(text):
     """
-    Preprocess and tokenize the example text.
+    Preprocess and tokenize the example text:
+    - Remove non alphabetic characters
+    - Set all characters to lowercase
+    - Add end of sentence and padding tokens
 
     Parameters:
         text: Input text to be processed
@@ -163,26 +168,15 @@ def preprocess_text_minimal(text):
     Returns:
         words: List of tokenized, preprocessed words.
     """
-    MAX_SEQ_LEN = 180
 
-    # We will start with just removing any non alphabetic characters and making everything lowercase
-    # should change in future though, extract numbers/emails/etc
-
-    # Change commas to spaces to preserve separation
-    text = re.sub(r"[,]", " ", text)
-
-    # Remove non alphabetic/space characters.
+    # Remove all non alphabetic characters, set the rest to lowercase, then split on whitespace
+    text = re.sub(r"[,]", " ", text) # Change commas to spaces to preserve separation
     text = re.sub(r"[^a-zA-Z ]", "", text)
-
-    # Change all letters to lowercase for uniformity.
     text = text.lower()
-
-    # Split on whitespace (and commas due to the above regex) to create tokens
     words = text.split()
 
     # Insert end of sentence token, then pad up to the max sequence length.
     words.append("<eos>")
-
     for i in range(len(words), MAX_SEQ_LEN):
         words.append("<pad>")
 
@@ -191,21 +185,30 @@ def preprocess_text_minimal(text):
 
 def preprocess_text(text):
     """
-    Preprocess and tokenize the example text.
-    Replaces URLs/emails, keeps numbers, cleans text.
-    """
+    Preprocess and tokenize the example text:
+    - Replaces urls and emails with tokens
+    - Remove non alphabetic characters
+    - Set all characters to lowercase
+    - Add end of sentence and padding tokens
 
-    MAX_SEQ_LEN = 180
+    Parameters:
+        text: Input text to be processed
+
+    Returns:
+        words: List of tokenized, preprocessed words.
+    """
+    
+    # Replace urls/emails with tokens
     text = re.sub(r"(https?:\/\/\S+)", "<url>", text)
     text = re.sub(r"\S+@\S+", "<email>", text)
 
+    # Remove all non alphabetic characters, set the rest to lowercase, then split on whitespace
     text = re.sub(r"[,]", " ", text)
-    text = re.sub(r"[^a-zA-Z0-9@.<>\s]", "", text)  # keep numbers and tokens
+    text = re.sub(r"[^a-zA-Z0-9<>\s]", "", text)  # keep numbers and tokens
     text = text.lower()
-    words = text.split(" ")
+    words = text.split()
 
-    words = [w for w in words if w != ""]  # remove empty
-    words.insert(0, "<cls>")
+    # Insert end of sentence token, then pad up to the max sequence length.
     words.append("<eos>")
     words += (
         ["<pad>"] * (MAX_SEQ_LEN - len(words))
@@ -217,14 +220,32 @@ def preprocess_text(text):
 
 
 def preprocess_no_special_tokens(text):
+    """
+    Preprocess and tokenize the example text:
+    - Replaces urls and emails with tokens
+    - Remove non alphabetic characters
+    - Set all characters to lowercase
+    - Add padding tokens
+
+    Parameters:
+        text: Input text to be processed
+
+    Returns:
+        words: List of tokenized, preprocessed words.
+    """
+
+    # Replace urls/emails with tokens
     text = re.sub(r"(https?:\/\/\S+)", "<url>", text)
     text = re.sub(r"\S+@\S+", "<email>", text)
+
+    # Remove all non alphabetic characters, set the rest to lowercase, then split on whitespace
     text = re.sub(r"[,]", " ", text)
-    text = re.sub(r"[^a-zA-Z0-9@.<>\s]", "", text)
+    text = re.sub(r"[^a-zA-Z0-9<>\s]", "", text)
     text = text.lower()
     words = text.split(" ")
     words = [w for w in words if w != ""]
-    MAX_SEQ_LEN = 180
+
+    # Insert end of sentence token, then pad up to the max sequence length.
     words += (
         ["<pad>"] * (MAX_SEQ_LEN - len(words))
         if len(words) < MAX_SEQ_LEN
@@ -235,11 +256,24 @@ def preprocess_no_special_tokens(text):
 
 
 def preprocess_raw(text):
+    """
+    Preprocess and tokenize the example text:
+    - Set all characters to lowercase
+    - Add end of sentence and padding tokens
+
+    Parameters:
+        text: Input text to be processed
+
+    Returns:
+        words: List of tokenized, preprocessed words.
+    """
+    
+    # Set text to lowercase then split on whitespace
     text = text.lower()
     words = text.split()
-    words.insert(0, "<cls>")
+
+    # Insert end of sentence token, then pad up to the max sequence length.
     words.append("<eos>")
-    MAX_SEQ_LEN = 180
     words += (
         ["<pad>"] * (MAX_SEQ_LEN - len(words))
         if len(words) < MAX_SEQ_LEN
@@ -250,15 +284,33 @@ def preprocess_raw(text):
 
 
 def preprocess_stemmed(text):
+    """
+    Preprocess and tokenize the example text:
+    - Replaces urls and emails with tokens
+    - Remove non alphabetic characters
+    - Set all characters to lowercase
+    - Stems all words
+    - Add end of sentence and padding tokens
+
+    Parameters:
+        text: Input text to be processed
+
+    Returns:
+        words: List of tokenized, preprocessed words.
+    """
+    
+    # Replace urls/emails with tokens
     text = re.sub(r"(https?:\/\/\S+)", "<url>", text)
     text = re.sub(r"\S+@\S+", "<email>", text)
+
+    # Remove all non alphabetic characters, set the rest to lowercase, split on whitespace, then apply stemming
     text = re.sub(r"[,]", " ", text)
-    text = re.sub(r"[^a-zA-Z0-9@.<>\s]", "", text)
+    text = re.sub(r"[^a-zA-Z0-9<>\s]", "", text)
     text = text.lower()
     words = [ps.stem(w) for w in text.split() if w]
-    words.insert(0, "<cls>")
+
+    # Insert end of sentence token, then pad up to the max sequence length.
     words.append("<eos>")
-    MAX_SEQ_LEN = 180
     words += (
         ["<pad>"] * (MAX_SEQ_LEN - len(words))
         if len(words) < MAX_SEQ_LEN
@@ -269,22 +321,34 @@ def preprocess_stemmed(text):
 
 def preprocess_wordpiece(text):
     """
-    Tokenize using BERT WordPiece (via HuggingFace).
-    - Cleans URLs/emails the same way as preprocess_text
-    - Adds <cls> / <eos>, pads/truncates to MAX_SEQ_LEN
-    """
-    MAX_SEQ_LEN = 180
+    Preprocess and tokenize the example text:
+    - Replaces urls and emails with tokens
+    - Remove non alphabetic characters
+    - Set all characters to lowercase
+    - Tokenize using BERT WordPiece (via HuggingFace).
+    - Add end of sentence and padding tokens
 
+    Parameters:
+        text: Input text to be processed
+
+    Returns:
+        words: List of tokenized, preprocessed words.
+    """
+
+    # Replace urls/emails with tokens
     text = re.sub(r"(https?:\/\/\S+)", "<url>", text)
     text = re.sub(r"\S+@\S+", "<email>", text)
+
+    # Remove all non alphabetic characters and set the rest to lowercase
     text = re.sub(r"[,]", " ", text)
-    text = re.sub(r"[^a-zA-Z0-9@.<>\s]", "", text)
+    text = re.sub(r"[^a-zA-Z0-9<>\s]", "", text)
     text = text.lower()
 
+    # Apply BERT WordPiece tokenizer
     pieces = _wp_tokenizer.tokenize(text)
 
-    tokens = ["<cls>"] + pieces + ["<eos>"]
-
+    # Insert end of sentence token, then pad up to the max sequence length.
+    tokens = pieces + ["<eos>"]
     if len(tokens) < MAX_SEQ_LEN:
         tokens += ["<pad>"] * (MAX_SEQ_LEN - len(tokens))
     else:
@@ -308,9 +372,6 @@ def get_top_k_words(tokens, attention_weights, vocabulary, k=3):
             attention_weights_pruned.append((weight, index))
 
     attention_weights_pruned.sort(reverse=True)
-
-    # print([vocabulary.itos[idx] for idx in tokens])
-    # print(attention_weights_pruned)
 
     # Get top K non-special tokens
     top_k_attention_weights = attention_weights_pruned[:k]

@@ -7,16 +7,12 @@ from sklearn.metrics import (
     classification_report,
     confusion_matrix,
 )
-
 import numpy as np
-
 from train import train
 from training.trainer import validate_epoch
 from tuning import tuning
-
 from model.config import default_config, focal_best_config
 from model.TransformerClassifier import TransformerClassifier
-
 from utils.loss import (
     FocalLoss,
     binary_cross_entropy_loss,
@@ -24,10 +20,8 @@ from utils.loss import (
     get_pos_weight,
     weighted_bce_with_logits_loss,
 )
-
 from utils.splits import generate_kfold_splits, generate_stratified_splits
 from analyze.evaluate_model import plot_prediction_confidence
-
 from data_process import (
     build_data,
     preprocess_text,
@@ -40,11 +34,176 @@ from data_process import (
     get_top_k_words,
 )
 
+def seed_everything(seed: int = 42):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
+def main():
+    """
+    Trains a TransformerClassifier model, saves it to a file, then outputs the performance metrics.
+    """
 
-# ale experiement section
+    seed_everything(42)
+
+    vocab_file_path = f"cache/vocab.pkl"
+
+    # Rebuild dataset & vocabulary with this strategy
+    dataset, vocab_size = build_data(preprocess_fn=preprocess_text, save_vocab_to_file=True, vocab_path=vocab_file_path)
+
+    config = default_config.copy()
+    config["vocab_size"] = vocab_size
+
+    train_loader, valid_loader, test_loader = generate_stratified_splits(
+        dataset=dataset,
+        batch_size=config["batch_size"]
+    )
+
+    criterion = FocalLoss(alpha=0.5, gamma=1.0)
+    save_path = f"outputs/model.pth"
+
+    # Train the model
+    model = train(
+        config=config,
+        model_cls=TransformerClassifier,
+        train_data=train_loader,
+        valid_data=valid_loader,
+        loss_fn=criterion,
+        save_path=save_path,
+    )
+
+    # Evaluate on test set
+    test_loss, test_acc, preds, labels = validate_epoch(
+        model,
+        test_loader,
+        device=device,
+        loss_fn=criterion,
+    )
+
+    print(f"Test Loss: {test_loss:.4f} | Test Acc: {test_acc:.4f}")
+    cm = confusion_matrix(labels, preds)
+
+    print(cm)
+    print(classification_report(labels, preds, target_names=["Ham", "Spam"]))
+
+def run_model(text=None, model_path='outputs/model.pth'):
+    """ Run inference on a saved model and output the prediction + Top K words. """
+
+    config = default_config.copy()
+
+    if not text:
+        text = "Thanks for your subscription to Ringtone UK your mobile will be charged �5/month Please confirm by"
+    
+    # Load the Vocabulary object from the file
+    filename = "cache/vocab.pkl"
+    if os.path.exists(filename):
+        with open(filename, "rb") as file:
+            vocabulary = pickle.load(file)
+    else:
+        print("Missing Vocabulary file. Try rebuilding the dataset.")
+        return
+
+    # Tokenize the input text
+    input = get_input_from_text(text, vocabulary)
+
+    # Load the existing model
+    model = TransformerClassifier.from_config(**config)
+    model_state_path = model_path
+    model_state = torch.load(model_state_path)
+    model.load_state_dict(model_state)
+    model.eval()
+
+    logits, attention_weights = model.forward(input, get_attn_weights=True)
+    vals = torch.sigmoid(logits)
+
+    # Calculate probabilities and Top K
+    if vals[0] < 0.5:
+        likelihood = (0.5 - vals[0]) * 200
+        typ = "Not Spam"
+    else:
+        likelihood = (vals[0] - 0.5) * 200
+        typ = "Spam"
+
+    print(f"The message is classified as {typ} with a probability of {likelihood}%")
+
+    top_k_words = get_top_k_words(
+        input.squeeze(0).tolist(), attention_weights.squeeze(0).tolist()[1:], vocabulary
+    )
+
+    print(
+        f"The top words that were used to determine this are: {",".join(top_k_words)}"
+    )
+
+def run_tokenization_test():
+    """
+    Trains a TransformerClassifier model with varied tokenization strategies.
+    """
+
+    seed_everything(42)
+
+    # Map a name to each preprocessing strategy
+    strategies = {
+        'default': preprocess_text,
+        'minimal': preprocess_text_minimal,
+        'no_special': preprocess_no_special_tokens,
+        'raw': preprocess_raw,
+        'stemmed': preprocess_stemmed,
+        'wordpiece': preprocess_wordpiece
+    }
+
+    for name, proc_fn in strategies.items():
+        print(f"\n\n=== Training with '{name}' tokenization ===")
+
+        vocab_file_path = f"cache/{name}.vocab.pkl"
+        # Rebuild dataset & vocabulary with this strategy
+        dataset, vocab_size = build_data(preprocess_fn=proc_fn, save_vocab_to_file=True, vocab_path=vocab_file_path)
+
+        config = default_config.copy()
+        config["vocab_size"] = vocab_size
+
+        train_loader, valid_loader, test_loader = generate_stratified_splits(
+            dataset=dataset,
+            batch_size=config["batch_size"]
+        )
+
+        criterion = FocalLoss(alpha=0.5, gamma=1.0)
+        loss_used = 'focal'
+
+        # criterion = get_loss_wrapper(binary_cross_entropy_loss, apply_sigmoid=True)
+        # loss_used = 'BCE'
+
+        # Save each model under a distinct name
+        save_path = f"outputs/{name}_{loss_used}_model.pth"
+        model = train(
+            config=config,
+            model_cls=TransformerClassifier,
+            train_data=train_loader,
+            valid_data=valid_loader,
+            loss_fn=criterion,
+            save_path=save_path,
+        )
+
+        # Evaluate on test set
+        test_loss, test_acc, preds, labels = validate_epoch(
+            model,
+            test_loader,
+            device=device,
+            loss_fn=criterion,
+        )
+
+        print(f"[{name}] Test Loss: {test_loss:.4f} | Test Acc: {test_acc:.4f}")
+        cm = confusion_matrix(labels, preds)
+        print(cm)
+        print(classification_report(labels, preds, target_names=["Ham", "Spam"]))
+
 def run_training():
-    #  best model for task was focal loss with alpha=0.25 and gamma=2.0
+
+    #  Best model for task was focal loss with alpha=0.25 and gamma=2.0
     dataset, vocab_size = build_data()
 
     loss_fn = FocalLoss(alpha=0.25, gamma=3.0)
@@ -57,12 +216,12 @@ def run_training():
     model = train(
         config=config,
         model_cls=TransformerClassifier,
-        train=train_loader,
-        valid=valid_loader,
+        train_data=train_loader,
+        valid_data=valid_loader,
         loss_fn=loss_fn,
     )
 
-    # load model from
+    # load model 
     checkpoint_path = "outputs/focal_model.pth"
     model = TransformerClassifier.from_config(**config).to("cpu")
     model.load_state_dict(torch.load(checkpoint_path, map_location="cpu"))
@@ -167,124 +326,6 @@ def run_tuning():
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-def seed_everything(seed: int = 42):
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    os.environ['PYTHONHASHSEED'] = str(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-
-def main():
-    seed_everything(42)
-
-    # Map a name to each preprocessing strategy
-    strategies = {
-        'default': preprocess_text,
-        'minimal': preprocess_text_minimal,
-        'no_special': preprocess_no_special_tokens,
-        'raw': preprocess_raw,
-        'stemmed': preprocess_stemmed,
-        'wordpiece': preprocess_wordpiece
-    }
-
-    for name, proc_fn in strategies.items():
-        print(f"\n\n=== Training with '{name}' tokenization ===")
-
-        vocab_file_path = f"cache/{name}.vocab.pkl"
-        # Rebuild dataset & vocabulary with this strategy
-        dataset, vocab_size = build_data(preprocess_fn=proc_fn, save_vocab_to_file=True, vocab_path=vocab_file_path)
-
-        config = default_config.copy()
-        config["vocab_size"] = vocab_size
-
-        train_loader, valid_loader, test_loader = generate_stratified_splits(
-            dataset=dataset,
-            batch_size=config["batch_size"]
-        )
-
-        criterion = FocalLoss(alpha=0.5, gamma=1.0)
-        loss_used = 'focal'
-
-        # criterion = get_loss_wrapper(binary_cross_entropy_loss, apply_sigmoid=True)
-        # loss_used = 'BCE'
-
-        # Save each model under a distinct name
-        save_path = f"outputs/{name}_{loss_used}_model.pth"
-        model = train(
-            config=config,
-            model_cls=TransformerClassifier,
-            train=train_loader,
-            valid=valid_loader,
-            loss_fn=criterion,
-            save_path=save_path,
-        )
-
-        # Evaluate on test set
-        test_loss, test_acc, preds, labels = validate_epoch(
-            model,
-            test_loader,
-            device=device,
-            loss_fn=criterion,
-        )
-        print(f"[{name}] Test Loss: {test_loss:.4f} | Test Acc: {test_acc:.4f}")
-        cm = confusion_matrix(labels, preds)
-        print(cm)
-        print(classification_report(labels, preds, target_names=["Ham", "Spam"]))
-
-
-
-
-def run_model(text=None, model_path='outputs/bce_model_tst.pth'):
-    """ Run inference on a saved model and output the prediction + Top K words. """
-
-    config = default_config.copy()
-
-    if not text:
-        text = "Thanks for your subscription to Ringtone UK your mobile will be charged �5/month Please confirm by"
-    
-    # Load the Vocabulary object from the file
-    filename = "cache/vocab.pkl"
-    if os.path.exists(filename):
-        with open(filename, "rb") as file:
-            vocabulary = pickle.load(file)
-    else:
-        print("Missing Vocabulary file. Try rebuilding the dataset.")
-        return
-
-    # Tokenize the input text
-    input = get_input_from_text(text, vocabulary)
-
-    # Load the existing model
-    model = TransformerClassifier.from_config(**config)
-    model_state_path = model_path
-    model_state = torch.load(model_state_path)
-    model.load_state_dict(model_state)
-    model.eval()
-
-    logits, attention_weights = model.forward(input, get_attn_weights=True)
-    vals = torch.sigmoid(logits)
-
-    # Calculate probabilities and Top K
-    if vals[0] < 0.5:
-        likelihood = (0.5 - vals[0]) * 200
-        typ = "Not Spam"
-    else:
-        likelihood = (vals[0] - 0.5) * 200
-        typ = "Spam"
-
-    print(f"The message is classified as {typ} with a probability of {likelihood}%")
-
-    top_k_words = get_top_k_words(
-        input.squeeze(0).tolist(), attention_weights.squeeze(0).tolist()[1:], vocabulary
-    )
-
-    print(
-        f"The top words that were used to determines this are: {",".join(top_k_words)}"
-    )
-
-
-main()
-run_model()
+if __name__ == "__main__":
+    #main()
+    run_model(text="Sample Spam Text. Is this spam? It might be. ")

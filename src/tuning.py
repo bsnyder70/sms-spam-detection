@@ -12,6 +12,7 @@ from utils.plots import plot_multiple_losses
 from training.trainer import train_epoch, validate_epoch
 from sklearn.metrics import precision_score, recall_score, f1_score
 
+# Various hyperparameters to test
 sweep_param = {
     "learning_rate": [5e-5, 1e-4, 2e-4, 3e-4],
     "embed_dim": [64, 128, 256],
@@ -20,17 +21,20 @@ sweep_param = {
     "num_heads": [2, 4],
 }
 
-
 def tuning(
-    config: dict[str, Any],
+    config,
     dataset,
-    folds: List[Tuple[np.ndarray, np.ndarray]],
-    model_cls: SupportsFromConfig,
+    folds,
+    model_cls,
     loss_fn,
-    optimizer_cls: type = torch.optim.AdamW,
-    optimizer_kwargs: dict = None,
-    sweep_label: str = "",
+    optimizer_cls = torch.optim.AdamW,
+    optimizer_kwargs = None,
+    sweep_label = "",
 ) -> BestResult:
+    """
+    Run the train/validation loop on varied hyperparameters, recording the best results as applicable.
+    """
+
     if optimizer_kwargs is None:
         optimizer_kwargs = {}
 

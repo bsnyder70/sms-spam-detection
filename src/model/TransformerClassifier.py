@@ -6,6 +6,15 @@ from typing import Tuple, Union
 
 
 class TransformerClassifier(nn.Module):
+    """
+    Custom Transformer-based Classifier designed for Spam Classification.
+
+    The structure is: 
+    1) Embedding Layer + Positional Encoding (with CLS parameter append)
+    2) Transformer Encoder Layers
+    3) Feedforward Neural Network (with one hidden layer)
+    """
+
     def __init__(
         self,
         vocab_size: int,
@@ -19,9 +28,11 @@ class TransformerClassifier(nn.Module):
     ) -> None:
         super().__init__()
 
+        # Embedding Layers
         self.embedding_str = nn.Embedding(vocab_size, embed_dim)
         self.embedding_pos = nn.Embedding(max_length, embed_dim)
 
+        # Transformer Encoder Layers
         self.encoder_layers = nn.ModuleList(
             [
                 nn.TransformerEncoderLayer(
@@ -35,8 +46,10 @@ class TransformerClassifier(nn.Module):
             ]
         )
 
+        # CLS Token
         self.cls_token = nn.Parameter(torch.randn(1, 1, embed_dim))
 
+        # Feedforward Neural Network Classifier
         self.classifier = nn.Sequential(
             nn.Linear(embed_dim, class_hidden_dim),
             nn.ReLU(),
@@ -56,21 +69,26 @@ class TransformerClassifier(nn.Module):
         Returns:
             logits or (logits, attention_weights)
         """
+
         N, T = X.shape
 
+        # Pass input through embedding layers
         embedding_str = self.embedding_str(X)
         pos = torch.arange(T, device=X.device).expand(N, T)
         embedding_pos = self.embedding_pos(pos)
         embedding = embedding_str + embedding_pos
 
+        # Append cls token to the embedding
         cls = self.cls_token.expand(N, -1, -1)
         encoder_input = torch.cat([cls, embedding], dim=1)
 
         attention_weights_l1: Optional[Tensor] = None
 
+        # Pass encoded input through the Transformer layers
         for i, layer in enumerate(self.encoder_layers):
-            if i == 0 and get_attn_weights:
 
+            # If attn weight extraction is enabled, add hook to the first layer
+            if i == 0 and get_attn_weights:
                 def attn_hook(module, input, output):
                     _, attn = output
                     nonlocal attention_weights_l1
@@ -83,6 +101,7 @@ class TransformerClassifier(nn.Module):
             if i == 0 and get_attn_weights:
                 handle.remove()
 
+        # Pass cls token output to the classifier
         cls_out = encoder_input[:, 0, :]
         logits = self.classifier(cls_out).squeeze(-1)
 
@@ -92,6 +111,8 @@ class TransformerClassifier(nn.Module):
 
     @staticmethod
     def from_config(**config) -> "TransformerClassifier":
+        """ Return a TransformerClassifier instance with a given configuration """
+        
         return TransformerClassifier(
             vocab_size=config["vocab_size"],
             embed_dim=config["embed_dim"],

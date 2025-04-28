@@ -1,6 +1,6 @@
 from matplotlib import pyplot as plt
 import numpy as np
-from src.data_process import build_data
+from data_process import build_data
 from model.TransformerClassifier import TransformerClassifier
 from sklearn.metrics import confusion_matrix, classification_report
 import torch

@@ -1,6 +1,5 @@
 from typing import TypedDict, Any
 
-
 class BestResult(TypedDict):
     param: str
     f1: float
